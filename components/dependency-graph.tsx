@@ -220,7 +220,7 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
       )
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(80))
+      .force("collision", d3.forceCollide().radius(70))
 
     const link = g
       .append("g")
@@ -285,119 +285,76 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
           .attr("fill", "hsl(var(--primary-foreground))")
           .text("Project")
       } else {
-        // Simplified component nodes
-        const nodeWidth = 140
-        const nodeHeight = 50
+        // Cube-style component nodes
+        const nodeWidth = 120
+        const nodeHeight = 80
 
+        // Get CVE level and color
+        const maxSeverity = getMaxSeverity(d.component!.vulnerabilities)
+        const cubeColor = getCVEColor(maxSeverity, d.component!.isDirect)
+
+        // Main cube
         g.append("rect")
           .attr("width", nodeWidth)
           .attr("height", nodeHeight)
           .attr("x", -nodeWidth / 2)
           .attr("y", -nodeHeight / 2)
-          .attr("rx", 8)
-          .attr("fill", "hsl(var(--card))")
+          .attr("rx", 6)
+          .attr("fill", cubeColor)
           .attr("stroke", (d) => (selectedComponent?.id === d.id ? "hsl(var(--primary))" : "hsl(var(--border))"))
           .attr("stroke-width", (d) => (selectedComponent?.id === d.id ? 2 : 1))
-          .attr("filter", "drop-shadow(0 1px 3px rgba(0,0,0,0.1))")
+          .attr("filter", "drop-shadow(0 2px 4px rgba(0,0,0,0.15))")
 
-        // Severity indicator (left side)
-        g.append("circle")
-          .attr("cx", -nodeWidth / 2 + 12)
-          .attr("cy", 0)
-          .attr("r", 6)
-          .attr("fill", (d) => {
-            const color = d.severityColor
-            return color === "bg-red-500"
-              ? "#ef4444"
-              : color === "bg-orange-500"
-                ? "#f97316"
-                : color === "bg-yellow-500"
-                  ? "#eab308"
-                  : color === "bg-green-500"
-                    ? "#22c55e"
-                    : "hsl(var(--muted))"
-          })
-
-        // Component name (center)
+        // Library name (top of cube)
         g.append("text")
           .attr("x", 0)
-          .attr("y", -8)
+          .attr("y", -nodeHeight / 2 + 18)
           .attr("text-anchor", "middle")
-          .attr("font-size", "11")
-          .attr("font-weight", "500")
-          .attr("fill", "hsl(var(--foreground))")
+          .attr("font-size", "12")
+          .attr("font-weight", "600")
+          .attr("fill", "white")
           .text((d) => {
             const name = d.component!.name
-            return name.length > 18 ? name.substring(0, 18) + "..." : name
+            return name.length > 15 ? name.substring(0, 15) + "..." : name
           })
 
-        // Version (center, below name)
+        // Version (bottom right)
         g.append("text")
-          .attr("x", 0)
-          .attr("y", 6)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "9")
-          .attr("fill", "hsl(var(--muted-foreground))")
+          .attr("x", nodeWidth / 2 - 8)
+          .attr("y", nodeHeight / 2 - 8)
+          .attr("text-anchor", "end")
+          .attr("font-size", "10")
+          .attr("font-weight", "500")
+          .attr("fill", "white")
           .text((d) => d.component!.version)
 
-        // Badges (right side)
-        let xOffset = nodeWidth / 2 - 15
-
-        if (d.component!.isDirect) {
-          g.append("circle")
-            .attr("cx", xOffset)
-            .attr("cy", -nodeHeight / 2 + 12)
-            .attr("r", 4)
-            .attr("fill", "hsl(var(--primary))")
-
-          xOffset -= 10
-        }
-
-        if (d.component!.vulnerabilities.length > 0) {
-          g.append("circle")
-            .attr("cx", xOffset)
-            .attr("cy", -nodeHeight / 2 + 12)
-            .attr("r", 4)
-            .attr("fill", (d) => {
-              return d.severityColor === "bg-red-500"
-                ? "#ef4444"
-                : d.severityColor === "bg-orange-500"
-                  ? "#f97316"
-                  : d.severityColor === "bg-yellow-500"
-                    ? "#eab308"
-                    : "#22c55e"
-            })
-
-          // Vulnerability count
-          g.append("text")
-            .attr("x", xOffset)
-            .attr("y", -nodeHeight / 2 + 16)
-            .attr("text-anchor", "middle")
-            .attr("font-size", "8")
-            .attr("font-weight", "bold")
-            .attr("fill", "white")
-            .text(d.component!.vulnerabilities.length)
-
-          xOffset -= 10
-        }
+        // Threat level (bottom left)
+        g.append("text")
+          .attr("x", -nodeWidth / 2 + 8)
+          .attr("y", nodeHeight / 2 - 8)
+          .attr("text-anchor", "start")
+          .attr("font-size", "10")
+          .attr("font-weight", "500")
+          .attr("fill", "white")
+          .text(maxSeverity === "none" ? "N/A" : maxSeverity.toUpperCase())
 
         // Expand/collapse button (if has children)
         if (d.childCount && d.childCount > 0) {
           g.append("circle")
             .attr("cx", nodeWidth / 2 - 12)
-            .attr("cy", nodeHeight / 2 - 12)
+            .attr("cy", -nodeHeight / 2 + 12)
             .attr("r", 8)
-            .attr("fill", "hsl(var(--primary))")
-            .attr("stroke", "hsl(var(--background))")
+            .attr("fill", "rgba(255,255,255,0.9)")
+            .attr("stroke", "hsl(var(--border))")
             .attr("stroke-width", 1)
 
           g.append("text")
             .attr("x", nodeWidth / 2 - 12)
-            .attr("y", nodeHeight / 2 - 8)
+            .attr("y", -nodeHeight / 2 + 16)
             .attr("text-anchor", "middle")
             .attr("font-size", "10")
             .attr("font-weight", "bold")
-            .attr("fill", "hsl(var(--primary-foreground))")
+            .attr("fill", "hsl(var(--foreground))")
             .text(d.isCollapsed ? "+" : "−")
         }
       }
@@ -521,23 +478,31 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
 
       <div className="absolute top-4 right-4 bg-card border border-border rounded-lg p-3 text-xs space-y-3">
         <div>
-          <div className="font-semibold mb-2">Severity</div>
+          <div className="font-semibold mb-2">CVE Level</div>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <div className="w-4 h-3 rounded" style={{ backgroundColor: "#dc2626" }} />
               <span>Critical</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-orange-500" />
+              <div className="w-4 h-3 rounded" style={{ backgroundColor: "#ea580c" }} />
               <span>High</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-yellow-500" />
+              <div className="w-4 h-3 rounded" style={{ backgroundColor: "#ca8a04" }} />
               <span>Medium</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <div className="w-4 h-3 rounded" style={{ backgroundColor: "#16a34a" }} />
               <span>Low</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-3 rounded" style={{ backgroundColor: "#2563eb" }} />
+              <span>Direct (No CVE)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-3 rounded" style={{ backgroundColor: "#6b7280" }} />
+              <span>Transitive (No CVE)</span>
             </div>
           </div>
         </div>
@@ -579,5 +544,21 @@ function getSeverityColor(severity: string): string {
       return "bg-green-500"
     default:
       return "bg-muted"
+  }
+}
+
+function getCVEColor(severity: string, isDirect: boolean): string {
+  switch (severity) {
+    case "critical":
+      return "#dc2626" // Red
+    case "high":
+      return "#ea580c" // Orange
+    case "medium":
+      return "#ca8a04" // Yellow
+    case "low":
+      return "#16a34a" // Green
+    default:
+      // No vulnerabilities - blue for direct, grey for transitive
+      return isDirect ? "#2563eb" : "#6b7280"
   }
 }
