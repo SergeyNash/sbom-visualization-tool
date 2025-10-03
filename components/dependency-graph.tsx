@@ -35,6 +35,7 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
   const tooltipRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set())
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null)
 
   const filteredComponents = useMemo(() => {
@@ -161,6 +162,18 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
     })
   }, [])
 
+  const toggleExpand = useCallback((nodeId: string) => {
+    setExpandedNodes((prev) => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) {
+        next.delete(nodeId)
+      } else {
+        next.add(nodeId)
+      }
+      return next
+    })
+  }, [])
+
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -228,10 +241,11 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
       .data(graphData.links)
       .join("line")
       .attr("stroke", "hsl(var(--muted-foreground))")
-      .attr("stroke-opacity", 0.6)
-      .attr("stroke-width", 2)
+      .attr("stroke-opacity", 0.8)
+      .attr("stroke-width", 3)
       .attr("marker-end", "url(#arrowhead)")
-      .attr("stroke-dasharray", "5,5")
+      .attr("stroke-dasharray", "8,4")
+      .attr("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.1))")
 
     const node = g
       .append("g")
@@ -243,6 +257,7 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
       .on("click", (event, d) => {
         event.stopPropagation()
         if (d.component) {
+          toggleExpand(d.id)
           onComponentSelect(d.component)
         }
       })
@@ -261,101 +276,151 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
 
     node.each(function (d) {
       const g = d3.select(this)
+      const isExpanded = expandedNodes.has(d.id)
 
       if (d.isRoot) {
+        // Root node - always expanded
         g.append("circle")
-          .attr("r", 40)
+          .attr("r", 35)
           .attr("fill", "hsl(var(--primary))")
           .attr("stroke", "hsl(var(--primary-foreground))")
           .attr("stroke-width", 2)
 
         g.append("text")
           .attr("text-anchor", "middle")
-          .attr("dy", -5)
-          .attr("font-size", "14")
+          .attr("dy", -8)
+          .attr("font-size", "16")
           .attr("font-weight", "bold")
           .attr("fill", "hsl(var(--primary-foreground))")
           .text("📦")
 
         g.append("text")
           .attr("text-anchor", "middle")
-          .attr("dy", 15)
-          .attr("font-size", "10")
+          .attr("dy", 20)
+          .attr("font-size", "12")
           .attr("font-weight", "600")
           .attr("fill", "hsl(var(--primary-foreground))")
           .text("Project")
       } else {
-        // Cube-style component nodes
-        const nodeWidth = 120
-        const nodeHeight = 80
-
-        // Get CVE level and color
+        // Component nodes - dot or expanded rectangle
         const maxSeverity = getMaxSeverity(d.component!.vulnerabilities)
-        const cubeColor = getCVEColor(maxSeverity, d.component!.isDirect)
+        const nodeColor = getCVEColor(maxSeverity, d.component!.isDirect)
 
-        // Main cube
-        g.append("rect")
-          .attr("width", nodeWidth)
-          .attr("height", nodeHeight)
-          .attr("x", -nodeWidth / 2)
-          .attr("y", -nodeHeight / 2)
-          .attr("rx", 6)
-          .attr("fill", cubeColor)
-          .attr("stroke", (d) => (selectedComponent?.id === d.id ? "hsl(var(--primary))" : "hsl(var(--border))"))
-          .attr("stroke-width", (d) => (selectedComponent?.id === d.id ? 2 : 1))
-          .attr("filter", "drop-shadow(0 2px 4px rgba(0,0,0,0.15))")
+        if (isExpanded) {
+          // Expanded rectangle
+          const nodeWidth = 140
+          const nodeHeight = 90
 
-        // Library name (top of cube)
-        g.append("text")
-          .attr("x", 0)
-          .attr("y", -nodeHeight / 2 + 18)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "12")
-          .attr("font-weight", "600")
-          .attr("fill", "white")
-          .text((d) => {
-            const name = d.component!.name
-            return name.length > 15 ? name.substring(0, 15) + "..." : name
-          })
+          // Main rectangle
+          g.append("rect")
+            .attr("width", nodeWidth)
+            .attr("height", nodeHeight)
+            .attr("x", -nodeWidth / 2)
+            .attr("y", -nodeHeight / 2)
+            .attr("rx", 8)
+            .attr("fill", nodeColor)
+            .attr("stroke", (d) => (selectedComponent?.id === d.id ? "hsl(var(--primary))" : "hsl(var(--border))"))
+            .attr("stroke-width", (d) => (selectedComponent?.id === d.id ? 3 : 1))
+            .attr("filter", "drop-shadow(0 3px 6px rgba(0,0,0,0.2))")
 
-        // Version (bottom right)
-        g.append("text")
-          .attr("x", nodeWidth / 2 - 8)
-          .attr("y", nodeHeight / 2 - 8)
-          .attr("text-anchor", "end")
-          .attr("font-size", "10")
-          .attr("font-weight", "500")
-          .attr("fill", "white")
-          .text((d) => d.component!.version)
+          // Library name (top)
+          g.append("text")
+            .attr("x", 0)
+            .attr("y", -nodeHeight / 2 + 20)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "13")
+            .attr("font-weight", "600")
+            .attr("fill", "white")
+            .text((d) => {
+              const name = d.component!.name
+              return name.length > 16 ? name.substring(0, 16) + "..." : name
+            })
 
-        // Threat level (bottom left)
-        g.append("text")
-          .attr("x", -nodeWidth / 2 + 8)
-          .attr("y", nodeHeight / 2 - 8)
-          .attr("text-anchor", "start")
-          .attr("font-size", "10")
-          .attr("font-weight", "500")
-          .attr("fill", "white")
-          .text(maxSeverity === "none" ? "N/A" : maxSeverity.toUpperCase())
+          // Version (bottom right)
+          g.append("text")
+            .attr("x", nodeWidth / 2 - 10)
+            .attr("y", nodeHeight / 2 - 10)
+            .attr("text-anchor", "end")
+            .attr("font-size", "11")
+            .attr("font-weight", "500")
+            .attr("fill", "white")
+            .text((d) => d.component!.version)
 
-        // Expand/collapse button (if has children)
-        if (d.childCount && d.childCount > 0) {
+          // Threat level (bottom left)
+          g.append("text")
+            .attr("x", -nodeWidth / 2 + 10)
+            .attr("y", nodeHeight / 2 - 10)
+            .attr("text-anchor", "start")
+            .attr("font-size", "11")
+            .attr("font-weight", "500")
+            .attr("fill", "white")
+            .text(maxSeverity === "none" ? "N/A" : maxSeverity.toUpperCase())
+
+          // Close button (top right)
           g.append("circle")
-            .attr("cx", nodeWidth / 2 - 12)
-            .attr("cy", -nodeHeight / 2 + 12)
-            .attr("r", 8)
+            .attr("cx", nodeWidth / 2 - 15)
+            .attr("cy", -nodeHeight / 2 + 15)
+            .attr("r", 10)
             .attr("fill", "rgba(255,255,255,0.9)")
             .attr("stroke", "hsl(var(--border))")
             .attr("stroke-width", 1)
 
           g.append("text")
-            .attr("x", nodeWidth / 2 - 12)
-            .attr("y", -nodeHeight / 2 + 16)
+            .attr("x", nodeWidth / 2 - 15)
+            .attr("y", -nodeHeight / 2 + 19)
             .attr("text-anchor", "middle")
-            .attr("font-size", "10")
+            .attr("font-size", "12")
             .attr("font-weight", "bold")
             .attr("fill", "hsl(var(--foreground))")
-            .text(d.isCollapsed ? "+" : "−")
+            .text("×")
+
+          // Expand/collapse button (if has children)
+          if (d.childCount && d.childCount > 0) {
+            g.append("circle")
+              .attr("cx", nodeWidth / 2 - 15)
+              .attr("cy", nodeHeight / 2 - 15)
+              .attr("r", 10)
+              .attr("fill", "rgba(255,255,255,0.9)")
+              .attr("stroke", "hsl(var(--border))")
+              .attr("stroke-width", 1)
+
+            g.append("text")
+              .attr("x", nodeWidth / 2 - 15)
+              .attr("y", nodeHeight / 2 - 11)
+              .attr("text-anchor", "middle")
+              .attr("font-size", "12")
+              .attr("font-weight", "bold")
+              .attr("fill", "hsl(var(--foreground))")
+              .text(d.isCollapsed ? "+" : "−")
+          }
+        } else {
+          // Collapsed dot
+          const dotRadius = 8
+
+          g.append("circle")
+            .attr("r", dotRadius)
+            .attr("fill", nodeColor)
+            .attr("stroke", (d) => (selectedComponent?.id === d.id ? "hsl(var(--primary))" : "white"))
+            .attr("stroke-width", (d) => (selectedComponent?.id === d.id ? 3 : 2))
+            .attr("filter", "drop-shadow(0 2px 4px rgba(0,0,0,0.3))")
+
+          // Show vulnerability count if any
+          if (d.component!.vulnerabilities.length > 0) {
+            g.append("text")
+              .attr("text-anchor", "middle")
+              .attr("dy", 4)
+              .attr("font-size", "8")
+              .attr("font-weight", "bold")
+              .attr("fill", "white")
+              .text(d.component!.vulnerabilities.length)
+          }
+
+          // Show expand indicator
+          g.append("circle")
+            .attr("r", 3)
+            .attr("fill", "rgba(255,255,255,0.8)")
+            .attr("cx", dotRadius * 0.7)
+            .attr("cy", -dotRadius * 0.7)
         }
       }
     })
