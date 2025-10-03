@@ -470,7 +470,7 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
     return () => {
       simulation.stop()
     }
-  }, [graphData, dimensions, onComponentSelect, selectedComponent, toggleCollapse])
+  }, [graphData, dimensions, onComponentSelect, selectedComponent, toggleCollapse, expandedNodes])
 
   const handleZoomIn = () => {
     ;(svgRef.current as any)?.zoomIn?.()
@@ -574,8 +574,8 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
         <div className="border-t border-border pt-2">
           <div className="font-semibold mb-2">Interactions</div>
           <div className="space-y-1 text-[10px]">
-            <div>Click: Select node</div>
-            <div>Double-click: Expand/collapse</div>
+            <div>Click: Expand/select node</div>
+            <div>Double-click: Collapse children</div>
             <div>Drag: Move node</div>
             <div>Scroll: Zoom</div>
           </div>
