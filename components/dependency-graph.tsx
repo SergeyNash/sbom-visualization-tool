@@ -241,10 +241,9 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
       .data(graphData.links)
       .join("line")
       .attr("stroke", "hsl(var(--muted-foreground))")
-      .attr("stroke-opacity", 0.8)
-      .attr("stroke-width", 3)
+      .attr("stroke-opacity", 0.7)
+      .attr("stroke-width", 2)
       .attr("marker-end", "url(#arrowhead)")
-      .attr("stroke-dasharray", "8,4")
       .attr("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.1))")
 
     const node = g
