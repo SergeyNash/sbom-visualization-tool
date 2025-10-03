@@ -198,14 +198,16 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
       .append("marker")
       .attr("id", "arrowhead")
       .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 25)
+      .attr("refX", 20)
       .attr("refY", 0)
-      .attr("markerWidth", 6)
-      .attr("markerHeight", 6)
+      .attr("markerWidth", 8)
+      .attr("markerHeight", 8)
       .attr("orient", "auto")
       .append("path")
       .attr("d", "M0,-5L10,0L0,5")
       .attr("fill", "hsl(var(--muted-foreground))")
+      .attr("stroke", "hsl(var(--muted-foreground))")
+      .attr("stroke-width", 1)
 
     const simulation = d3
       .forceSimulation<GraphNode>(graphData.nodes)
@@ -216,9 +218,9 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
           .id((d) => d.id)
           .distance(150),
       )
-      .force("charge", d3.forceManyBody().strength(-400))
+      .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(60))
+      .force("collision", d3.forceCollide().radius(80))
 
     const link = g
       .append("g")
@@ -226,9 +228,10 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
       .data(graphData.links)
       .join("line")
       .attr("stroke", "hsl(var(--muted-foreground))")
-      .attr("stroke-opacity", 0.3)
-      .attr("stroke-width", 1)
+      .attr("stroke-opacity", 0.6)
+      .attr("stroke-width", 2)
       .attr("marker-end", "url(#arrowhead)")
+      .attr("stroke-dasharray", "5,5")
 
     const node = g
       .append("g")
@@ -282,20 +285,26 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
           .attr("fill", "hsl(var(--primary-foreground))")
           .text("Project")
       } else {
+        // Simplified component nodes
+        const nodeWidth = 140
+        const nodeHeight = 50
+
         g.append("rect")
-          .attr("width", 180)
-          .attr("height", 70)
-          .attr("x", -90)
-          .attr("y", -35)
+          .attr("width", nodeWidth)
+          .attr("height", nodeHeight)
+          .attr("x", -nodeWidth / 2)
+          .attr("y", -nodeHeight / 2)
           .attr("rx", 8)
           .attr("fill", "hsl(var(--card))")
           .attr("stroke", (d) => (selectedComponent?.id === d.id ? "hsl(var(--primary))" : "hsl(var(--border))"))
           .attr("stroke-width", (d) => (selectedComponent?.id === d.id ? 2 : 1))
+          .attr("filter", "drop-shadow(0 1px 3px rgba(0,0,0,0.1))")
 
+        // Severity indicator (left side)
         g.append("circle")
-          .attr("cx", -75)
-          .attr("cy", -20)
-          .attr("r", 4)
+          .attr("cx", -nodeWidth / 2 + 12)
+          .attr("cy", 0)
+          .attr("r", 6)
           .attr("fill", (d) => {
             const color = d.severityColor
             return color === "bg-red-500"
@@ -309,91 +318,84 @@ export function DependencyGraph({ sbomData, filters, onComponentSelect, selected
                     : "hsl(var(--muted))"
           })
 
+        // Component name (center)
         g.append("text")
-          .attr("x", -75)
-          .attr("y", 0)
-          .attr("text-anchor", "start")
-          .attr("font-size", "14")
-          .attr("fill", "hsl(var(--muted-foreground))")
-          .text("📦")
-
-        g.append("text")
-          .attr("x", -55)
-          .attr("y", -5)
-          .attr("text-anchor", "start")
-          .attr("font-size", "12")
+          .attr("x", 0)
+          .attr("y", -8)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "11")
           .attr("font-weight", "500")
           .attr("fill", "hsl(var(--foreground))")
           .text((d) => {
             const name = d.component!.name
-            return name.length > 20 ? name.substring(0, 20) + "..." : name
+            return name.length > 18 ? name.substring(0, 18) + "..." : name
           })
 
+        // Version (center, below name)
         g.append("text")
-          .attr("x", -55)
-          .attr("y", 10)
-          .attr("text-anchor", "start")
-          .attr("font-size", "10")
+          .attr("x", 0)
+          .attr("y", 6)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "9")
           .attr("fill", "hsl(var(--muted-foreground))")
           .text((d) => d.component!.version)
 
-        let xOffset = -75
+        // Badges (right side)
+        let xOffset = nodeWidth / 2 - 15
 
         if (d.component!.isDirect) {
-          g.append("rect")
-            .attr("x", xOffset)
-            .attr("y", 18)
-            .attr("width", 35)
-            .attr("height", 14)
-            .attr("rx", 3)
-            .attr("fill", "hsl(var(--primary) / 0.1)")
-
-          g.append("text")
-            .attr("x", xOffset + 17.5)
-            .attr("y", 28)
-            .attr("text-anchor", "middle")
-            .attr("font-size", "9")
+          g.append("circle")
+            .attr("cx", xOffset)
+            .attr("cy", -nodeHeight / 2 + 12)
+            .attr("r", 4)
             .attr("fill", "hsl(var(--primary))")
-            .text("Direct")
 
-          xOffset += 40
+          xOffset -= 10
         }
 
         if (d.component!.vulnerabilities.length > 0) {
-          g.append("text")
-            .attr("x", xOffset)
-            .attr("y", 28)
-            .attr("text-anchor", "start")
-            .attr("font-size", "10")
-            .attr(
-              "fill",
-              d.severityColor === "bg-red-500"
+          g.append("circle")
+            .attr("cx", xOffset)
+            .attr("cy", -nodeHeight / 2 + 12)
+            .attr("r", 4)
+            .attr("fill", (d) => {
+              return d.severityColor === "bg-red-500"
                 ? "#ef4444"
                 : d.severityColor === "bg-orange-500"
                   ? "#f97316"
                   : d.severityColor === "bg-yellow-500"
                     ? "#eab308"
-                    : "#22c55e",
-            )
-            .text(`⚠ ${d.component!.vulnerabilities.length}`)
+                    : "#22c55e"
+            })
 
-          xOffset += 30
+          // Vulnerability count
+          g.append("text")
+            .attr("x", xOffset)
+            .attr("y", -nodeHeight / 2 + 16)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "8")
+            .attr("font-weight", "bold")
+            .attr("fill", "white")
+            .text(d.component!.vulnerabilities.length)
+
+          xOffset -= 10
         }
 
+        // Expand/collapse button (if has children)
         if (d.childCount && d.childCount > 0) {
           g.append("circle")
-            .attr("cx", 75)
-            .attr("cy", 0)
-            .attr("r", 10)
+            .attr("cx", nodeWidth / 2 - 12)
+            .attr("cy", nodeHeight / 2 - 12)
+            .attr("r", 8)
             .attr("fill", "hsl(var(--primary))")
             .attr("stroke", "hsl(var(--background))")
-            .attr("stroke-width", 2)
+            .attr("stroke-width", 1)
 
           g.append("text")
-            .attr("x", 75)
-            .attr("y", 4)
+            .attr("x", nodeWidth / 2 - 12)
+            .attr("y", nodeHeight / 2 - 8)
             .attr("text-anchor", "middle")
-            .attr("font-size", "12")
+            .attr("font-size", "10")
             .attr("font-weight", "bold")
             .attr("fill", "hsl(var(--primary-foreground))")
             .text(d.isCollapsed ? "+" : "−")
